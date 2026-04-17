@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page_title }}</title>
+</head>
+<body>
+    <main>
+        <p><a href="/leads">Назад к списку</a></p>
+        <h1>Карточка Lead #{{ lead.id }}</h1>
+
+        {% if error_message %}
+        <p style="color: #b00020;">{{ error_message }}</p>
+        {% endif %}
+
+        <section>
+            <h2>Профиль</h2>
+            <ul>
+                <li><strong>Platform:</strong> {{ lead.platform }}</li>
+                <li><strong>Profile name:</strong> {{ lead.profile_name }}</li>
+                <li><strong>Profile URL:</strong> <a href="{{ lead.profile_url }}">{{ lead.profile_url }}</a></li>
+                <li><strong>Source URL:</strong> {{ lead.source_url or "-" }}</li>
+                <li><strong>Detected theme:</strong> {{ lead.detected_theme or "-" }}</li>
+                <li><strong>Score:</strong> {{ lead.score if lead.score is not none else "-" }}</li>
+                <li><strong>Status:</strong> {{ lead.status }}</li>
+                <li><strong>Created at:</strong> {{ lead.created_at }}</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>Обновление статуса (FSM)</h2>
+            {% if allowed_next_statuses %}
+            <form method="post" action="/leads/{{ lead.id }}/status">
+                <label>Новый статус:
+                    <select name="new_status" required>
+                        {% for status in allowed_next_statuses %}
+                        <option value="{{ status }}">{{ status }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <button type="submit">Обновить статус</button>
+            </form>
+            {% else %}
+            <p>Для текущего статуса нет допустимых переходов.</p>
+            {% endif %}
+        </section>
+
+        <section>
+            <h2>Заметки</h2>
+            <form method="post" action="/leads/{{ lead.id }}/notes">
+                <textarea name="notes" rows="8" cols="80">{{ lead.notes or "" }}</textarea><br><br>
+                <button type="submit">Сохранить заметку</button>
+            </form>
+        </section>
+
+        <section>
+            <h2>Source text</h2>
+            <pre>{{ lead.source_text or "-" }}</pre>
+        </section>
+    </main>
+</body>
+</html>
