@@ -6,6 +6,7 @@ from app.services.consultation_service import (
     list_consultations_by_lead,
     update_consultation_status_result,
 )
+from app.services.dashboard_service import get_lead_dashboard_metrics
 from app.services.lead_service import (
     InvalidStatusTransitionError,
     LEAD_STATUSES,
@@ -25,6 +26,7 @@ __all__ = [
     "get_consultation",
     "list_consultations_by_lead",
     "update_consultation_status_result",
+    "get_lead_dashboard_metrics",
     "InvalidStatusTransitionError",
     "LEAD_STATUSES",
     "create_lead",
