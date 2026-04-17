@@ -1,13 +1,18 @@
 import sqlite3
+import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import Callable, Iterator, TypeVar
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = PROJECT_ROOT / "data"
 DB_PATH = DATA_DIR / "lead_discovery_crm_mvp.db"
 SCHEMA_PATH = Path(__file__).resolve().parent / "schema.sql"
 SQLITE_CONNECT_TIMEOUT_SEC = 10.0
+SQLITE_BUSY_TIMEOUT_MS = 5000
+WRITE_RETRY_MAX_ATTEMPTS = 3
+WRITE_RETRY_BACKOFF_SEC = 0.05
+T = TypeVar("T")
 
 
 def _configure_connection(connection: sqlite3.Connection) -> None:
@@ -15,6 +20,12 @@ def _configure_connection(connection: sqlite3.Connection) -> None:
     connection.execute("PRAGMA foreign_keys = ON;")
     connection.execute("PRAGMA journal_mode = WAL;")
     connection.execute("PRAGMA synchronous = NORMAL;")
+    connection.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS};")
+
+
+def _is_transient_busy_error(error: sqlite3.OperationalError) -> bool:
+    message = str(error).lower()
+    return "database is locked" in message or "database table is locked" in message
 
 
 @contextmanager
@@ -49,3 +60,17 @@ def init_db() -> None:
 
         schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
         connection.executescript(schema_sql)
+
+
+def run_write_with_retry(operation: Callable[[], T]) -> T:
+    attempt = 0
+    while True:
+        try:
+            return operation()
+        except sqlite3.OperationalError as error:
+            attempt += 1
+            if not _is_transient_busy_error(error):
+                raise
+            if attempt >= WRITE_RETRY_MAX_ATTEMPTS:
+                raise
+            time.sleep(WRITE_RETRY_BACKOFF_SEC * attempt)
