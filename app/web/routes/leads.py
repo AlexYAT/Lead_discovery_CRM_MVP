@@ -3,14 +3,19 @@ from fastapi.responses import RedirectResponse
 from starlette import status
 
 from app.services import (
+    CONSULTATION_STATUSES,
     InvalidStatusTransitionError,
     LEAD_STATUSES,
     create_contact_attempt,
+    create_consultation,
     create_lead,
     get_allowed_next_statuses,
+    get_consultation,
     get_lead,
     list_contact_attempts_by_lead,
+    list_consultations_by_lead,
     list_leads,
+    update_consultation_status_result,
     update_lead_notes,
     update_lead_status,
 )
@@ -46,6 +51,8 @@ def _render_lead_detail(request: Request, lead_id: int, error_message: str = "")
             "lead": lead,
             "allowed_next_statuses": get_allowed_next_statuses(str(lead["status"])),
             "contact_attempts": list_contact_attempts_by_lead(lead_id=lead_id),
+            "consultation_statuses": CONSULTATION_STATUSES,
+            "consultations": list_consultations_by_lead(lead_id=lead_id),
             "error_message": error_message,
         },
     )
@@ -80,6 +87,58 @@ async def lead_create_action(request: Request):
         score=str(form.get("score", "")),
         notes=str(form.get("notes", "")),
     )
+
+    return RedirectResponse(
+        url=f"/leads/{lead_id}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/{lead_id}/consultations")
+async def lead_consultation_add_action(request: Request, lead_id: int):
+    form = await request.form()
+
+    lead = get_lead(lead_id)
+    if lead is None:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    create_consultation(
+        lead_id=lead_id,
+        planned_at=str(form.get("planned_at", "")),
+        status=str(form.get("status", "planned")),
+        result=str(form.get("result", "")),
+    )
+
+    return RedirectResponse(
+        url=f"/leads/{lead_id}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/{lead_id}/consultations/{consultation_id}")
+async def lead_consultation_update_action(request: Request, lead_id: int, consultation_id: int):
+    form = await request.form()
+
+    lead = get_lead(lead_id)
+    if lead is None:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    consultation = get_consultation(consultation_id=consultation_id)
+    if consultation is None or int(consultation["lead_id"]) != lead_id:
+        raise HTTPException(status_code=404, detail="Consultation not found")
+
+    try:
+        update_consultation_status_result(
+            consultation_id=consultation_id,
+            status=str(form.get("status", "")),
+            result=str(form.get("result", "")),
+        )
+    except ValueError as error:
+        return _render_lead_detail(
+            request=request,
+            lead_id=lead_id,
+            error_message=f"Ошибка обновления консультации: {error}",
+        )
 
     return RedirectResponse(
         url=f"/leads/{lead_id}",

@@ -102,6 +102,74 @@
         </section>
 
         <section>
+            <h2>Consultation Management</h2>
+            <form method="post" action="/leads/{{ lead.id }}/consultations">
+                <label>Planned at:
+                    <input type="text" name="planned_at" placeholder="2026-04-20 15:00:00" required>
+                </label><br><br>
+                <label>Status:
+                    <select name="status" required>
+                        {% for consultation_status in consultation_statuses %}
+                        <option value="{{ consultation_status }}">{{ consultation_status }}</option>
+                        {% endfor %}
+                    </select>
+                </label><br><br>
+                <label>Result:<br><textarea name="result" rows="3" cols="80"></textarea></label><br><br>
+                <button type="submit">Создать консультацию</button>
+            </form>
+        </section>
+
+        <section>
+            <h2>Список консультаций</h2>
+            {% if consultations %}
+            <table border="1" cellpadding="8" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Planned at</th>
+                        <th>Status</th>
+                        <th>Result</th>
+                        <th>Обновление</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for consultation in consultations %}
+                    <tr>
+                        <td>{{ consultation.id }}</td>
+                        <td>{{ consultation.planned_at }}</td>
+                        <td>{{ consultation.status }}</td>
+                        <td>{{ consultation.result or "-" }}</td>
+                        <td>
+                            <form method="post" action="/leads/{{ lead.id }}/consultations/{{ consultation.id }}">
+                                <select name="status" required>
+                                    {% for consultation_status in consultation_statuses %}
+                                    <option
+                                        value="{{ consultation_status }}"
+                                        {% if consultation_status == consultation.status %}selected{% endif %}
+                                    >
+                                        {{ consultation_status }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <input
+                                    type="text"
+                                    name="result"
+                                    value="{{ consultation.result or '' }}"
+                                    placeholder="result"
+                                >
+                                <button type="submit">Сохранить</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>Консультаций пока нет.</p>
+            {% endif %}
+        </section>
+
+        <section>
             <h2>Source text</h2>
             <pre>{{ lead.source_text or "-" }}</pre>
         </section>
