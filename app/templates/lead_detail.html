@@ -55,6 +55,53 @@
         </section>
 
         <section>
+            <h2>Contact Log</h2>
+            <form method="post" action="/leads/{{ lead.id }}/contacts">
+                <label>Дата (ISO, опционально):
+                    <input type="text" name="date" placeholder="2026-04-17 12:00:00">
+                </label><br><br>
+                <label>Текст сообщения:<br><textarea name="message_text" rows="4" cols="80"></textarea></label><br><br>
+                <label>Outcome:
+                    <input type="text" name="outcome" placeholder="replied / no_response / ...">
+                </label><br><br>
+                <label>Next action:
+                    <input type="text" name="next_action" placeholder="follow_up_in_2_days">
+                </label><br><br>
+                <button type="submit">Добавить попытку контакта</button>
+            </form>
+        </section>
+
+        <section>
+            <h2>История контактов</h2>
+            {% if contact_attempts %}
+            <table border="1" cellpadding="8" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Date</th>
+                        <th>Message</th>
+                        <th>Outcome</th>
+                        <th>Next action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for attempt in contact_attempts %}
+                    <tr>
+                        <td>{{ attempt.id }}</td>
+                        <td>{{ attempt.date }}</td>
+                        <td>{{ attempt.message_text or "-" }}</td>
+                        <td>{{ attempt.outcome or "-" }}</td>
+                        <td>{{ attempt.next_action or "-" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>Попыток контакта пока нет.</p>
+            {% endif %}
+        </section>
+
+        <section>
             <h2>Source text</h2>
             <pre>{{ lead.source_text or "-" }}</pre>
         </section>

@@ -5,9 +5,11 @@ from starlette import status
 from app.services import (
     InvalidStatusTransitionError,
     LEAD_STATUSES,
+    create_contact_attempt,
     create_lead,
     get_allowed_next_statuses,
     get_lead,
+    list_contact_attempts_by_lead,
     list_leads,
     update_lead_notes,
     update_lead_status,
@@ -43,6 +45,7 @@ def _render_lead_detail(request: Request, lead_id: int, error_message: str = "")
             "page_title": f"Lead #{lead_id}",
             "lead": lead,
             "allowed_next_statuses": get_allowed_next_statuses(str(lead["status"])),
+            "contact_attempts": list_contact_attempts_by_lead(lead_id=lead_id),
             "error_message": error_message,
         },
     )
@@ -113,6 +116,28 @@ async def lead_status_update_action(request: Request, lead_id: int):
 async def lead_notes_update_action(request: Request, lead_id: int):
     form = await request.form()
     update_lead_notes(lead_id=lead_id, notes=str(form.get("notes", "")))
+
+    return RedirectResponse(
+        url=f"/leads/{lead_id}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/{lead_id}/contacts")
+async def lead_contact_add_action(request: Request, lead_id: int):
+    form = await request.form()
+
+    lead = get_lead(lead_id)
+    if lead is None:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    create_contact_attempt(
+        lead_id=lead_id,
+        date=str(form.get("date", "")),
+        message_text=str(form.get("message_text", "")),
+        outcome=str(form.get("outcome", "")),
+        next_action=str(form.get("next_action", "")),
+    )
 
     return RedirectResponse(
         url=f"/leads/{lead_id}",
