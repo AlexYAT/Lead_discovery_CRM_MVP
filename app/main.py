@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.api.routes.base import router as base_router
+from app.db import init_db
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -14,6 +15,11 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 app.include_router(base_router)
+
+
+@app.on_event("startup")
+def startup_init_db():
+    init_db()
 
 
 @app.get("/", tags=["SSR"])
