@@ -45,35 +45,38 @@ def create_lead(
     notes: str,
 ) -> int:
     parsed_score = float(score) if score else None
+    insert_values = (
+        platform.strip(),
+        profile_name.strip(),
+        profile_url.strip(),
+        source_url.strip() or None,
+        source_text.strip() or None,
+        detected_theme.strip() or None,
+        parsed_score,
+        notes.strip() or None,
+    )
+
     def _operation() -> int:
         with get_connection() as connection:
-            cursor = connection.execute(
-                """
-                INSERT INTO leads (
-                    platform,
-                    profile_name,
-                    profile_url,
-                    source_url,
-                    source_text,
-                    detected_theme,
-                    score,
-                    status,
-                    notes
+            with connection:
+                cursor = connection.execute(
+                    """
+                    INSERT INTO leads (
+                        platform,
+                        profile_name,
+                        profile_url,
+                        source_url,
+                        source_text,
+                        detected_theme,
+                        score,
+                        status,
+                        notes
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?)
+                    """,
+                    insert_values,
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?)
-                """,
-                (
-                    platform.strip(),
-                    profile_name.strip(),
-                    profile_url.strip(),
-                    source_url.strip() or None,
-                    source_text.strip() or None,
-                    detected_theme.strip() or None,
-                    parsed_score,
-                    notes.strip() or None,
-                ),
-            )
-            return int(cursor.lastrowid)
+                return int(cursor.lastrowid)
 
     return run_write_with_retry(_operation)
 
@@ -140,20 +143,24 @@ def update_lead_status(lead_id: int, new_status: str) -> None:
 
     def _operation() -> None:
         with get_connection() as connection:
-            connection.execute(
-                "UPDATE leads SET status = ? WHERE id = ?",
-                (new_status, lead_id),
-            )
+            with connection:
+                connection.execute(
+                    "UPDATE leads SET status = ? WHERE id = ?",
+                    (new_status, lead_id),
+                )
 
     run_write_with_retry(_operation)
 
 
 def update_lead_notes(lead_id: int, notes: str) -> None:
+    stored_notes = notes.strip() or None
+
     def _operation() -> None:
         with get_connection() as connection:
-            connection.execute(
-                "UPDATE leads SET notes = ? WHERE id = ?",
-                (notes.strip() or None, lead_id),
-            )
+            with connection:
+                connection.execute(
+                    "UPDATE leads SET notes = ? WHERE id = ?",
+                    (stored_notes, lead_id),
+                )
 
     run_write_with_retry(_operation)

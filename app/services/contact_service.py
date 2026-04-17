@@ -12,28 +12,31 @@ def create_contact_attempt(
     next_action: str,
 ) -> int:
     parsed_date = date.strip() or None
+    insert_values = (
+        lead_id,
+        parsed_date,
+        message_text.strip() or None,
+        outcome.strip() or None,
+        next_action.strip() or None,
+    )
+
     def _operation() -> int:
         with get_connection() as connection:
-            cursor = connection.execute(
-                """
-                INSERT INTO contact_attempts (
-                    lead_id,
-                    date,
-                    message_text,
-                    outcome,
-                    next_action
+            with connection:
+                cursor = connection.execute(
+                    """
+                    INSERT INTO contact_attempts (
+                        lead_id,
+                        date,
+                        message_text,
+                        outcome,
+                        next_action
+                    )
+                    VALUES (?, COALESCE(?, CURRENT_TIMESTAMP), ?, ?, ?)
+                    """,
+                    insert_values,
                 )
-                VALUES (?, COALESCE(?, CURRENT_TIMESTAMP), ?, ?, ?)
-                """,
-                (
-                    lead_id,
-                    parsed_date,
-                    message_text.strip() or None,
-                    outcome.strip() or None,
-                    next_action.strip() or None,
-                ),
-            )
-            return int(cursor.lastrowid)
+                return int(cursor.lastrowid)
 
     return run_write_with_retry(_operation)
 

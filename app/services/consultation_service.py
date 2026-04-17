@@ -22,27 +22,30 @@ def create_consultation(
         normalized_status = "planned"
 
     normalized_planned_at = planned_at.strip() or "1970-01-01 00:00:00"
+    stored_result = result.strip() or None
+    insert_values = (
+        lead_id,
+        normalized_planned_at,
+        normalized_status,
+        stored_result,
+    )
 
     def _operation() -> int:
         with get_connection() as connection:
-            cursor = connection.execute(
-                """
-                INSERT INTO consultations (
-                    lead_id,
-                    planned_at,
-                    status,
-                    result
+            with connection:
+                cursor = connection.execute(
+                    """
+                    INSERT INTO consultations (
+                        lead_id,
+                        planned_at,
+                        status,
+                        result
+                    )
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    insert_values,
                 )
-                VALUES (?, ?, ?, ?)
-                """,
-                (
-                    lead_id,
-                    normalized_planned_at,
-                    normalized_status,
-                    result.strip() or None,
-                ),
-            )
-            return int(cursor.lastrowid)
+                return int(cursor.lastrowid)
 
     return run_write_with_retry(_operation)
 
@@ -85,19 +88,19 @@ def update_consultation_status_result(
     if normalized_status not in CONSULTATION_STATUSES:
         raise ValueError(f"Unknown consultation status: {normalized_status}")
 
+    stored_result = result.strip() or None
+    update_values = (normalized_status, stored_result, consultation_id)
+
     def _operation() -> None:
         with get_connection() as connection:
-            connection.execute(
-                """
-                UPDATE consultations
-                SET status = ?, result = ?
-                WHERE id = ?
-                """,
-                (
-                    normalized_status,
-                    result.strip() or None,
-                    consultation_id,
-                ),
-            )
+            with connection:
+                connection.execute(
+                    """
+                    UPDATE consultations
+                    SET status = ?, result = ?
+                    WHERE id = ?
+                    """,
+                    update_values,
+                )
 
     run_write_with_retry(_operation)
