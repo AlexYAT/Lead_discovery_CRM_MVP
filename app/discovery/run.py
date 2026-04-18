@@ -10,6 +10,8 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import sys
+from contextvars import Token
 
 from app.core.env_init import initialize_environment
 
@@ -19,6 +21,15 @@ from app.discovery.classification import classify_candidates
 from app.discovery.config import load_config_from_env, merge_cli_overrides
 from app.discovery.ingestion import ingest_candidates
 from app.discovery.normalization import normalize_candidates
+from app.discovery.observability import (
+    PipelineObservabilityCollector,
+    attach_pipeline_observability,
+    detach_pipeline_observability,
+    observe_after_classification,
+    observe_after_normalization,
+    observe_after_qualification,
+    observe_after_search,
+)
 from app.discovery.qualification import qualify_candidates
 from app.discovery.search import search_candidates
 
@@ -49,6 +60,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Run through normalization only; do not ingest into Candidate Queue",
     )
+    parser.add_argument(
+        "--discovery-observability",
+        action="store_true",
+        help="In-memory per-run stage snapshots for debug (no DB; see DOA-IMP-037)",
+    )
     return parser.parse_args()
 
 
@@ -62,27 +78,51 @@ def main() -> None:
         limit=args.limit,
     )
 
-    bounded_limit = max(0, min(cfg.default_limit, 20))
-    hits = search_candidates(args.query, bounded_limit, brave_api_key=cfg.brave_api_key)
-    classified = classify_candidates(
-        hits,
-        llm_enabled=cfg.llm_enabled,
-        openai_api_key=cfg.openai_api_key,
-    )
-    classified = qualify_candidates(
-        classified,
-        enabled=cfg.qualification_enabled,
-        min_confidence=cfg.qualification_min_confidence,
-    )
-    cls_mode = "llm" if (cfg.llm_enabled and cfg.openai_api_key) else "stub"
-    normalized = normalize_candidates(classified, classification_mode=cls_mode)
+    collector: PipelineObservabilityCollector | None = None
+    obs_token: Token | None = None
+    if args.discovery_observability:
+        collector = PipelineObservabilityCollector()
+        obs_token = attach_pipeline_observability(collector)
 
-    if args.dry_run:
-        saved_ids: list[int] = []
-    else:
-        saved_ids = ingest_candidates(normalized)
+    try:
+        bounded_limit = max(0, min(cfg.default_limit, 20))
+        hits = search_candidates(args.query, bounded_limit, brave_api_key=cfg.brave_api_key)
+        if collector is not None:
+            observe_after_search(hits)
+        classified = classify_candidates(
+            hits,
+            llm_enabled=cfg.llm_enabled,
+            openai_api_key=cfg.openai_api_key,
+        )
+        if collector is not None:
+            observe_after_classification(classified)
+        classified = qualify_candidates(
+            classified,
+            enabled=cfg.qualification_enabled,
+            min_confidence=cfg.qualification_min_confidence,
+        )
+        if collector is not None:
+            observe_after_qualification(classified)
+        cls_mode = "llm" if (cfg.llm_enabled and cfg.openai_api_key) else "stub"
+        normalized = normalize_candidates(classified, classification_mode=cls_mode)
+        if collector is not None:
+            observe_after_normalization(normalized)
 
-    pain_count = sum(1 for row in classified if row[1].is_pain)
+        if args.dry_run:
+            saved_ids: list[int] = []
+        else:
+            saved_ids = ingest_candidates(normalized)
+
+        pain_count = sum(1 for row in classified if row[1].is_pain)
+    finally:
+        if obs_token is not None:
+            detach_pipeline_observability(obs_token)
+
+    if collector is not None:
+        print(
+            f"discovery_observability: stages={len(collector.export_stages())}",
+            file=sys.stderr,
+        )
 
     has_openai_key = bool(cfg.openai_api_key)
     has_brave_key = bool(cfg.brave_api_key)
