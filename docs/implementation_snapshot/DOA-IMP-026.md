@@ -5,7 +5,7 @@
 - id: DOA-IMP-026
 - type: IMP
 - parent: DOA-OP-007
-- status: implemented
+- status: planned
 - date: 2026-04-18
 
 ---
