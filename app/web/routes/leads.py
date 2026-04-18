@@ -6,18 +6,20 @@ from app.services import (
     CONSULTATION_STATUSES,
     InvalidStatusTransitionError,
     LEAD_STATUSES,
-    create_contact_attempt,
-    create_consultation,
     create_lead,
     get_allowed_next_statuses,
-    get_consultation,
     get_lead,
-    list_contact_attempts_by_lead,
-    list_consultations_by_lead,
     list_leads,
-    update_consultation_status_result,
     update_lead_notes,
     update_lead_status,
+)
+from app.services.crm_service import (
+    create_consultation,
+    create_contact_attempt,
+    get_consultation,
+    list_consultations,
+    list_contact_attempts,
+    update_consultation_status,
 )
 
 router = APIRouter(prefix="/leads", tags=["Lead CRM"])
@@ -50,9 +52,9 @@ def _render_lead_detail(request: Request, lead_id: int, error_message: str = "")
             "page_title": f"Lead #{lead_id}",
             "lead": lead,
             "allowed_next_statuses": get_allowed_next_statuses(str(lead["status"])),
-            "contact_attempts": list_contact_attempts_by_lead(lead_id=lead_id),
+            "contact_attempts": list_contact_attempts(lead_id=lead_id),
             "consultation_statuses": CONSULTATION_STATUSES,
-            "consultations": list_consultations_by_lead(lead_id=lead_id),
+            "consultations": list_consultations(lead_id=lead_id),
             "error_message": error_message,
         },
     )
@@ -106,7 +108,7 @@ async def lead_consultation_add_action(request: Request, lead_id: int):
         lead_id=lead_id,
         planned_at=str(form.get("planned_at", "")),
         status=str(form.get("status", "planned")),
-        result=str(form.get("result", "")),
+        result=str(form.get("result", "")).strip() or None,
     )
 
     return RedirectResponse(
@@ -128,10 +130,10 @@ async def lead_consultation_update_action(request: Request, lead_id: int, consul
         raise HTTPException(status_code=404, detail="Consultation not found")
 
     try:
-        update_consultation_status_result(
+        update_consultation_status(
             consultation_id=consultation_id,
             status=str(form.get("status", "")),
-            result=str(form.get("result", "")),
+            result=str(form.get("result", "")).strip() or None,
         )
     except ValueError as error:
         return _render_lead_detail(
@@ -193,9 +195,9 @@ async def lead_contact_add_action(request: Request, lead_id: int):
     create_contact_attempt(
         lead_id=lead_id,
         date=str(form.get("date", "")),
-        message_text=str(form.get("message_text", "")),
-        outcome=str(form.get("outcome", "")),
-        next_action=str(form.get("next_action", "")),
+        message_text=str(form.get("message_text", "")).strip() or None,
+        outcome=str(form.get("outcome", "")).strip() or None,
+        next_action=str(form.get("next_action", "")).strip() or None,
     )
 
     return RedirectResponse(
