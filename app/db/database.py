@@ -45,19 +45,8 @@ def get_connection() -> Iterator[sqlite3.Connection]:
 
 
 def init_db() -> None:
+    """Apply schema DDL. Safe on existing DBs: CREATE/INDEX use IF NOT EXISTS (see DOA-AUD-002)."""
     with get_connection() as connection:
-        schema_exists = connection.execute(
-            """
-            SELECT 1
-            FROM sqlite_master
-            WHERE type = 'table' AND name = 'leads'
-            LIMIT 1
-            """
-        ).fetchone()
-
-        if schema_exists:
-            return
-
         schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
         connection.executescript(schema_sql)
 
