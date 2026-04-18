@@ -119,6 +119,20 @@ def list_consultations(lead_id: int) -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
+def get_consultation(consultation_id: int) -> dict[str, Any] | None:
+    with get_connection() as connection:
+        connection.row_factory = Row
+        row = connection.execute(
+            """
+            SELECT id, lead_id, planned_at, status, result, created_at
+            FROM consultations
+            WHERE id = ?
+            """,
+            (consultation_id,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
 def update_consultation_status(
     consultation_id: int,
     status: str,

@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.api.routes.base import router as base_router
+from app.api.routes.crm import router as crm_api_router
 from app.db import init_db
 from app.web import candidates_router, dashboard_router, leads_router
 
@@ -17,6 +18,7 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 app.state.templates = templates
 
 app.include_router(base_router)
+app.include_router(crm_api_router)
 app.include_router(candidates_router)
 app.include_router(leads_router)
 app.include_router(dashboard_router)
