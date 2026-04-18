@@ -5,7 +5,7 @@
 - id: DOA-IMP-026
 - type: IMP
 - parent: DOA-OP-007
-- status: planned
+- status: implemented
 - date: 2026-04-18
 
 ---
@@ -25,7 +25,7 @@ Search Acquisition Layer.
 
 ## Scope
 
-Планируется реализовать:
+Реализовано:
 
 - получение кандидатов через primary search provider
 - поддержка архитектурной точки для fallback provider
@@ -110,9 +110,39 @@ Search layer возвращает:
 
 ## Result
 
-- запланирована реализация Search Acquisition Layer
-- pipeline будет получать входной поток кандидатов после реализации
-- система будет готова к внедрению classification layer
+- реализован Search Acquisition Layer (минимальная версия)
+- pipeline способен возвращать raw candidate results
+- реализована базовая архитектура search provider (mock)
+- система готова к внедрению classification layer
+
+---
+
+## Implementation Details (MVP)
+
+Реализация выполнена в:
+
+app/discovery/search/
+
+Состав:
+
+- models.py:
+  - структура SearchHit (text, source_link)
+
+- search_provider.py:
+  - интерфейс SearchProvider
+
+- brave_provider.py:
+  - mock provider (детерминированные результаты)
+
+- service.py:
+  - функция search_candidates(query, limit)
+
+Характер реализации:
+
+- используется mock provider (без внешних API)
+- deterministic output
+- bounded recall (limit)
+- независимость от CRM
 
 ---
 
