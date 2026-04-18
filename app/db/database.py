@@ -44,11 +44,59 @@ def get_connection() -> Iterator[sqlite3.Connection]:
         connection.close()
 
 
+def _add_column_if_missing(
+    connection: sqlite3.Connection, table: str, column: str, column_def: str
+) -> bool:
+    """Idempotent migration helper for SQLite (IMP-021 CRM columns). Returns True if added."""
+    rows = connection.execute(f"PRAGMA table_info({table})").fetchall()
+    names = {str(row[1]) for row in rows}
+    if column in names:
+        return False
+    connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_def}")
+    return True
+
+
+def _ensure_imp021_crm_columns(connection: sqlite3.Connection) -> None:
+    """Ensure CRM tables match IMP-021 (created_at on contact_attempts, consultations)."""
+    # SQLite ADD COLUMN requires a constant default; backfill when we actually add the column.
+    sentinel = "'1970-01-01T00:00:00'"
+    added_attempts = _add_column_if_missing(
+        connection,
+        "contact_attempts",
+        "created_at",
+        f"TEXT NOT NULL DEFAULT {sentinel}",
+    )
+    if added_attempts:
+        connection.execute(
+            """
+            UPDATE contact_attempts
+            SET created_at = COALESCE(NULLIF(trim(date), ''), datetime('now'))
+            WHERE created_at = '1970-01-01T00:00:00'
+            """
+        )
+
+    added_consultations = _add_column_if_missing(
+        connection,
+        "consultations",
+        "created_at",
+        f"TEXT NOT NULL DEFAULT {sentinel}",
+    )
+    if added_consultations:
+        connection.execute(
+            """
+            UPDATE consultations
+            SET created_at = COALESCE(NULLIF(trim(planned_at), ''), datetime('now'))
+            WHERE created_at = '1970-01-01T00:00:00'
+            """
+        )
+
+
 def init_db() -> None:
     """Apply schema DDL. Safe on existing DBs: CREATE/INDEX use IF NOT EXISTS (see DOA-AUD-002)."""
     with get_connection() as connection:
         schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
         connection.executescript(schema_sql)
+        _ensure_imp021_crm_columns(connection)
 
 
 def run_write_with_retry(operation: Callable[[], T]) -> T:

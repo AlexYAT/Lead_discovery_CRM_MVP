@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS contact_attempts (
     message_text TEXT,
     outcome TEXT,
     next_action TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE CASCADE
 );
 
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS consultations (
     planned_at TEXT NOT NULL,
     status TEXT NOT NULL,
     result TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE CASCADE
 );
 
