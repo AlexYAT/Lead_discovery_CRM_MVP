@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .cursor/
 .venv/
+# Local secrets (API keys); use .env.example as template
+.env
