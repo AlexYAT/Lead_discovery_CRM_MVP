@@ -7,10 +7,20 @@ from app.db.database import get_connection, run_write_with_retry
 
 # Candidate queue lifecycle (DEC-004). FSM for leads is separate.
 CANDIDATE_STATUSES_NEW = "new"
+CANDIDATE_STATUS_REJECTED = "rejected"
+CANDIDATE_STATUS_CONVERTED = "converted"
 
 
 class CandidateImportError(ValueError):
     """Raised when CSV import fails validation (fail-fast)."""
+
+
+class CandidateNotFoundError(LookupError):
+    """No candidate row for the given id."""
+
+
+class CandidateStateError(ValueError):
+    """Candidate exists but operation is not allowed in its current status."""
 
 
 def import_candidates_from_csv(csv_text: str) -> int:
@@ -169,3 +179,128 @@ def get_candidate(candidate_id: int) -> dict[str, Any] | None:
             (candidate_id,),
         ).fetchone()
     return _row_to_dict(row)
+
+
+def reject_candidate(candidate_id: int) -> None:
+    """
+    Set candidate status to ``rejected`` (no physical DELETE).
+
+    - ``new`` → ``rejected``.
+    - ``rejected`` again → **no-op** (idempotent reject).
+    - ``converted`` → ``CandidateStateError`` (already linked to CRM).
+    """
+    def _operation() -> None:
+        with get_connection() as connection:
+            with connection:
+                row = connection.execute(
+                    "SELECT status FROM candidates WHERE id = ?",
+                    (candidate_id,),
+                ).fetchone()
+                if row is None:
+                    raise CandidateNotFoundError(f"Candidate not found: {candidate_id}")
+                status = str(row[0])
+                if status == CANDIDATE_STATUS_REJECTED:
+                    return
+                if status == CANDIDATE_STATUS_CONVERTED:
+                    raise CandidateStateError("Cannot reject a converted candidate")
+                if status != CANDIDATE_STATUSES_NEW:
+                    raise CandidateStateError(f"Cannot reject candidate in status: {status}")
+                connection.execute(
+                    """
+                    UPDATE candidates
+                    SET status = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    """,
+                    (CANDIDATE_STATUS_REJECTED, candidate_id),
+                )
+
+    run_write_with_retry(_operation)
+
+
+def convert_candidate_to_lead(candidate_id: int) -> int:
+    """
+    Atomically create a lead from a ``new`` candidate and mark candidate ``converted`` with ``lead_id``.
+
+    Mapping matches ``create_lead`` semantics: optional lead fields are empty/NULL; score is unset.
+
+    - Only ``new`` candidates may convert.
+    - ``rejected`` / ``converted`` → ``CandidateStateError``.
+    - Second convert on same candidate → ``CandidateStateError`` (``converted``).
+
+    Returns the new ``lead_id``.
+    """
+    def _operation() -> int:
+        with get_connection() as connection:
+            with connection:
+                connection.row_factory = Row
+                row = connection.execute(
+                    """
+                    SELECT platform, profile_name, profile_url, notes, status
+                    FROM candidates
+                    WHERE id = ?
+                    """,
+                    (candidate_id,),
+                ).fetchone()
+                if row is None:
+                    raise CandidateNotFoundError(f"Candidate not found: {candidate_id}")
+                status = str(row["status"])
+                if status == CANDIDATE_STATUS_CONVERTED:
+                    raise CandidateStateError("Candidate is already converted")
+                if status == CANDIDATE_STATUS_REJECTED:
+                    raise CandidateStateError("Cannot convert a rejected candidate")
+                if status != CANDIDATE_STATUSES_NEW:
+                    raise CandidateStateError(f"Cannot convert candidate in status: {status}")
+
+                platform = str(row["platform"]).strip()
+                profile_name = str(row["profile_name"]).strip()
+                profile_url = str(row["profile_url"]).strip()
+                notes_raw = row["notes"]
+                notes_stored = (str(notes_raw).strip() or None) if notes_raw is not None else None
+
+                lead_cursor = connection.execute(
+                    """
+                    INSERT INTO leads (
+                        platform,
+                        profile_name,
+                        profile_url,
+                        source_url,
+                        source_text,
+                        detected_theme,
+                        score,
+                        status,
+                        notes
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?)
+                    """,
+                    (
+                        platform,
+                        profile_name,
+                        profile_url,
+                        None,
+                        None,
+                        None,
+                        None,
+                        notes_stored,
+                    ),
+                )
+                lead_id = int(lead_cursor.lastrowid)
+
+                upd = connection.execute(
+                    """
+                    UPDATE candidates
+                    SET lead_id = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ? AND status = ?
+                    """,
+                    (
+                        lead_id,
+                        CANDIDATE_STATUS_CONVERTED,
+                        candidate_id,
+                        CANDIDATE_STATUSES_NEW,
+                    ),
+                )
+                if upd.rowcount != 1:
+                    raise CandidateStateError("Candidate state changed during convert")
+
+                return lead_id
+
+    return run_write_with_retry(_operation)

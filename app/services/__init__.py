@@ -1,9 +1,13 @@
 from app.services.candidate_service import (
     CandidateImportError,
+    CandidateNotFoundError,
+    CandidateStateError,
+    convert_candidate_to_lead,
     create_candidate,
     get_candidate,
     import_candidates_from_csv,
     list_candidates,
+    reject_candidate,
 )
 from app.services.contact_service import create_contact_attempt, list_contact_attempts_by_lead
 from app.services.consultation_service import (
@@ -27,10 +31,14 @@ from app.services.lead_service import (
 
 __all__ = [
     "CandidateImportError",
+    "CandidateNotFoundError",
+    "CandidateStateError",
+    "convert_candidate_to_lead",
     "create_candidate",
     "get_candidate",
     "import_candidates_from_csv",
     "list_candidates",
+    "reject_candidate",
     "create_contact_attempt",
     "list_contact_attempts_by_lead",
     "CONSULTATION_STATUSES",
