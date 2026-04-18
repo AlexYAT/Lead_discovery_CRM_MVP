@@ -64,7 +64,9 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 Шаблон переменных для **discovery CLI** (`python -m app.discovery.run`, см. `RUN.md`): скопируйте **`.env.example`** в **`.env`** в корне репозитория и при необходимости измените значения. Файл **`.env`** с секретами **не коммитьте**.
 
-Чтение окружения для discovery выполняется **только** в **`app/discovery/config.py`** (`load_config_from_env`); на baseline перечисленные переменные **все optional** — без ключей и без части `DISCOVERY_*` pipeline остаётся рабочим (stub / mock search / graceful fallback).
+Файл **`.env`** в корне подхватывается **автоматически** при локальном старте процесса (до чтения настроек discovery): вызывается **`app.core.env_init.initialize_environment()`** из **`app.main`** (uvicorn) и из **`app.discovery.run`**. Уже заданные в shell / ОС переменные **не перезаписываются** значениями из `.env`. Если `.env` нет, процесс продолжает работу с текущим окружением.
+
+Чтение значений для discovery по-прежнему выполняется **только** в **`app/discovery/config.py`** (`load_config_from_env`); загрузка `.env` ограничена **`app/core/env_init.py`**. Перечисленные переменные **все optional** — без ключей и без части `DISCOVERY_*` pipeline остаётся рабочим (stub / mock search / graceful fallback).
 
 | Переменная | Default (если не задана) | Назначение |
 |------------|--------------------------|------------|
@@ -82,7 +84,8 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 ```
 app/
-  main.py              # FastAPI app, роутеры, startup → init_db
+  main.py              # FastAPI app, роутеры, startup → init_db; ранний env init
+  core/                # env_init: `.env` до Config Layer (локальный runtime)
   api/routes/          # JSON API (/api/...)
   web/routes/          # SSR pages
   services/            # Доменная логика

@@ -1,5 +1,7 @@
 """
-CLI entrypoint for VK discovery pipeline (DOA-OP-007-A, IMP-030; config IMP-031).
+CLI entrypoint for VK discovery pipeline (DOA-OP-007-A, IMP-030; config IMP-031; env IMP-036).
+
+Calls ``initialize_environment()`` before importing discovery config so ``.env`` is applied first.
 
 Usage:
     python -m app.discovery.run --query "..." --limit 10
@@ -8,6 +10,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
+
+from app.core.env_init import initialize_environment
+
+initialize_environment()
 
 from app.discovery.classification import classify_candidates
 from app.discovery.config import load_config_from_env, merge_cli_overrides
