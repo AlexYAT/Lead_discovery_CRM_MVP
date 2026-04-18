@@ -25,7 +25,7 @@ Search Acquisition Layer.
 
 ## Scope
 
-Реализовано:
+Планируется реализовать:
 
 - получение кандидатов через primary search provider
 - поддержка архитектурной точки для fallback provider
@@ -110,9 +110,9 @@ Search layer возвращает:
 
 ## Result
 
-- реализован Search Acquisition Layer
-- pipeline получил первый рабочий входной поток кандидатов
-- система готова к внедрению classification layer
+- запланирована реализация Search Acquisition Layer
+- pipeline будет получать входной поток кандидатов после реализации
+- система будет готова к внедрению classification layer
 
 ---
 
