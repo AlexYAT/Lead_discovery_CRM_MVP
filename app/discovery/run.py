@@ -13,6 +13,7 @@ from app.discovery.classification import classify_candidates
 from app.discovery.config import load_config_from_env, merge_cli_overrides
 from app.discovery.ingestion import ingest_candidates
 from app.discovery.normalization import normalize_candidates
+from app.discovery.qualification import qualify_candidates
 from app.discovery.search import search_candidates
 
 
@@ -62,6 +63,11 @@ def main() -> None:
         llm_enabled=cfg.llm_enabled,
         openai_api_key=cfg.openai_api_key,
     )
+    classified = qualify_candidates(
+        classified,
+        enabled=cfg.qualification_enabled,
+        min_confidence=cfg.qualification_min_confidence,
+    )
     cls_mode = "llm" if (cfg.llm_enabled and cfg.openai_api_key) else "stub"
     normalized = normalize_candidates(classified, classification_mode=cls_mode)
 
@@ -70,13 +76,14 @@ def main() -> None:
     else:
         saved_ids = ingest_candidates(normalized)
 
-    pain_count = sum(1 for _, c in classified if c.is_pain)
+    pain_count = sum(1 for row in classified if row[1].is_pain)
 
     has_openai_key = bool(cfg.openai_api_key)
     has_brave_key = bool(cfg.brave_api_key)
     print(
         f"llm_enabled={cfg.llm_enabled} source={cfg.source!r} limit={cfg.default_limit} "
-        f"has_openai_key={has_openai_key} has_brave_key={has_brave_key}"
+        f"has_openai_key={has_openai_key} has_brave_key={has_brave_key} "
+        f"qualification_enabled={cfg.qualification_enabled}"
     )
     print(f"found(raw)={len(hits)}")
     print(f"passed_classification(pain)={pain_count}")

@@ -24,6 +24,7 @@ def normalize_hit(
     classification: ClassificationResult,
     *,
     classification_mode: str | None = None,
+    qualification_meta: dict[str, str] | None = None,
 ) -> NormalizedCandidate:
     """
     Map search hit + classification into a normalized discovery record.
@@ -35,6 +36,9 @@ def normalize_hit(
         "classifier_reason": (classification.reason or "")[:500],
         "classification_mode": mode_label,
     }
+    if qualification_meta:
+        for key, val in qualification_meta.items():
+            meta[str(key)[:80]] = str(val)[:200]
     theme = _detected_theme(classification.reason) if classification.is_pain else None
     score = float(classification.confidence) if classification.is_pain else None
 

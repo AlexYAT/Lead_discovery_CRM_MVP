@@ -20,6 +20,8 @@ class DiscoveryConfig:
     default_limit: int
     openai_api_key: str | None
     brave_api_key: str | None
+    qualification_enabled: bool
+    qualification_min_confidence: float
 
 
 def _parse_bool_env(value: str | None, default: bool) -> bool:
@@ -31,6 +33,15 @@ def _parse_bool_env(value: str | None, default: bool) -> bool:
     if v in ("0", "false", "no", "off"):
         return False
     return default
+
+
+def _parse_float_env(value: str | None, default: float) -> float:
+    if value is None or not str(value).strip():
+        return default
+    try:
+        return max(0.0, min(1.0, float(str(value).strip())))
+    except ValueError:
+        return default
 
 
 def _parse_int_env(value: str | None, default: int) -> int:
@@ -53,6 +64,11 @@ def load_config_from_env() -> DiscoveryConfig:
         default_limit=_parse_int_env(os.getenv("DISCOVERY_DEFAULT_LIMIT"), 10),
         openai_api_key=_normalize_secret(os.getenv("OPENAI_API_KEY")),
         brave_api_key=_normalize_secret(os.getenv("BRAVE_API_KEY")),
+        qualification_enabled=_parse_bool_env(os.getenv("DISCOVERY_QUALIFICATION_ENABLED"), False),
+        qualification_min_confidence=_parse_float_env(
+            os.getenv("DISCOVERY_QUALIFICATION_MIN_CONFIDENCE"),
+            0.45,
+        ),
     )
 
 
@@ -76,4 +92,6 @@ def merge_cli_overrides(
         default_limit=next_limit,
         openai_api_key=base.openai_api_key,
         brave_api_key=base.brave_api_key,
+        qualification_enabled=base.qualification_enabled,
+        qualification_min_confidence=base.qualification_min_confidence,
     )

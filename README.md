@@ -73,6 +73,8 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 | `DISCOVERY_LLM_ENABLED` | `false` | Базовый флаг LLM до CLI (`--llm` / `--no-llm` перекрывает при запуске) |
 | `DISCOVERY_SOURCE` | `vk` | Execution-level метка источника (лог / orchestration) |
 | `DISCOVERY_DEFAULT_LIMIT` | `10` | Лимит сырых hit’ов до учёта CLI `--limit` и внутреннего cap |
+| `DISCOVERY_QUALIFICATION_ENABLED` | `false` | Включает слой **soft qualification** после classification (метаданные в `NormalizedCandidate`) |
+| `DISCOVERY_QUALIFICATION_MIN_CONFIDENCE` | `0.45` | Порог confidence для tier `high` при `is_pain` (см. `app/discovery/qualification/`) |
 
 Секреты **не** передаются через аргументы CLI и **не** должны попадать в логи приложения.
 
