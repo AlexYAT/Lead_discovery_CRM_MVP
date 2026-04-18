@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page_title }}</title>
+</head>
+<body>
+    <main>
+        <p><a href="/">На главную</a> · <a href="/leads">Lead CRM</a></p>
+        <h1>{{ page_title }}</h1>
+
+        {% if error_message %}
+        <p style="color: #b00020;">{{ error_message }}</p>
+        {% endif %}
+
+        <section>
+            <h2>Импорт CSV</h2>
+            <p>Первая строка — заголовок: <code>platform,profile_name,profile_url</code> (опционально <code>notes</code>).</p>
+            <form method="post" action="/candidates/import">
+                <label>CSV (вставьте текст):<br>
+                    <textarea name="csv_text" rows="10" cols="80" placeholder="platform,profile_name,profile_url,notes"></textarea>
+                </label><br><br>
+                <button type="submit">Импортировать</button>
+            </form>
+        </section>
+
+        <section>
+            <h2>Очередь</h2>
+            {% if candidates %}
+            <table border="1" cellpadding="8" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Platform</th>
+                        <th>Profile name</th>
+                        <th>Profile URL</th>
+                        <th>Status</th>
+                        <th>Lead</th>
+                        <th>Создан</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in candidates %}
+                    <tr>
+                        <td>{{ c.id }}</td>
+                        <td>{{ c.platform }}</td>
+                        <td>{{ c.profile_name }}</td>
+                        <td><a href="{{ c.profile_url }}">{{ c.profile_url }}</a></td>
+                        <td>{{ c.status }}</td>
+                        <td>
+                            {% if c.lead_id %}
+                            <a href="/leads/{{ c.lead_id }}">Lead #{{ c.lead_id }}</a>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td>{{ c.created_at }}</td>
+                        <td>
+                            {% if c.status == 'new' %}
+                            <form method="post" action="/candidates/{{ c.id }}/reject" style="display:inline;">
+                                <button type="submit">Отклонить</button>
+                            </form>
+                            <form method="post" action="/candidates/{{ c.id }}/convert" style="display:inline;">
+                                <button type="submit">В CRM (lead)</button>
+                            </form>
+                            {% elif c.status == 'rejected' %}
+                            <span>Отклонён</span>
+                            {% elif c.status == 'converted' %}
+                            <span>В CRM</span>
+                            {% else %}
+                            <span>—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>Кандидатов пока нет.</p>
+            {% endif %}
+        </section>
+    </main>
+</body>
+</html>
