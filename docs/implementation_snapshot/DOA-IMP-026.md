@@ -28,9 +28,10 @@ Search Acquisition Layer.
 Реализовано:
 
 - получение кандидатов через primary search provider
-- поддержка архитектурной точки для fallback provider
+- заложена архитектурная точка для fallback provider (реализация не включена в MVP)
 - ограничение объёма выборки (bounded recall)
 - подготовка raw candidate results для следующего слоя
+- query strategy (predefined patterns) не реализована как отдельный модуль и будет добавлена в следующих шагах
 
 Не реализовано:
 
