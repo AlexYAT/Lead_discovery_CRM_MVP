@@ -17,7 +17,7 @@ def search_candidates(
 
     Does not classify, ingest, or touch CRM — raw hits only.
 
-    ``brave_api_key`` is reserved for future Brave HTTP integration (IMP-032 contract).
+    ``brave_api_key`` selects live Brave path when set; otherwise mock (DEC-011 / adapter).
     """
     backend: SearchProvider = (
         provider if provider is not None else BraveSearchProvider(brave_api_key=brave_api_key)

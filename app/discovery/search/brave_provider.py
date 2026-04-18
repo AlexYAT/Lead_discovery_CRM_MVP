@@ -1,27 +1,20 @@
+"""Primary search provider entry — delegates to Search Adapter (live + fallback)."""
+
+from __future__ import annotations
+
+from app.discovery.search.adapter import discovery_search
 from app.discovery.search.models import SearchHit
 
 
 class BraveSearchProvider:
     """
-    Primary search provider (Brave Search).
+    Discovery search provider: Brave live path when key present, else mock (DEC-011).
 
-    MVP: returns deterministic mock hits so the pipeline runs without API keys.
-    Replace ``search`` body with HTTP calls to Brave when credentials are available.
+    Implements the ``SearchProvider`` protocol via ``search(query, limit)``.
     """
 
     def __init__(self, brave_api_key: str | None = None) -> None:
-        self._brave_api_key = brave_api_key  # reserved for future Brave HTTP client
+        self._brave_api_key = brave_api_key
 
     def search(self, query: str, limit: int) -> list[SearchHit]:
-        trimmed = (query or "").strip()
-        q = trimmed or "(empty query)"
-        n = max(0, min(limit, 20))
-        hits: list[SearchHit] = []
-        for index in range(n):
-            hits.append(
-                SearchHit(
-                    text=f"[mock brave] {q} - synthetic discussion snippet #{index + 1}",
-                    source_link=f"https://vk.com/wall-mock-{index + 1}?q={index}",
-                )
-            )
-        return hits
+        return discovery_search(query, limit, brave_api_key=self._brave_api_key)
