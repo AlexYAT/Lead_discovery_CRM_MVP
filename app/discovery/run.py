@@ -1,5 +1,5 @@
 """
-CLI entrypoint for VK discovery pipeline (DOA-OP-007-A, IMP-030).
+CLI entrypoint for VK discovery pipeline (DOA-OP-007-A, IMP-030; config IMP-031).
 
 Usage:
     python -m app.discovery.run --query "..." --limit 10
@@ -11,6 +11,7 @@ import argparse
 import os
 
 from app.discovery.classification import classify_candidates
+from app.discovery.config import load_config_from_env, merge_cli_overrides
 from app.discovery.ingestion import ingest_candidates
 from app.discovery.normalization import normalize_candidates
 from app.discovery.search import search_candidates
@@ -19,12 +20,23 @@ from app.discovery.search import search_candidates
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run VK discovery pipeline (search → classify → normalize → ingest).")
     parser.add_argument("--query", type=str, required=True, help="Search query string")
-    parser.add_argument("--limit", type=int, default=10, help="Max raw hits (capped by search layer)")
-    parser.add_argument("--source", type=str, default="vk", help="Logical source label (logged; pipeline uses VK-shaped mock URLs)")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Max raw hits (overrides DISCOVERY_DEFAULT_LIMIT / config default)",
+    )
+    parser.add_argument(
+        "--source",
+        type=str,
+        default=None,
+        help="Execution-level source label (overrides DISCOVERY_SOURCE)",
+    )
     parser.add_argument(
         "--llm",
-        action="store_true",
-        help="Allow LLM classification if OPENAI_API_KEY is set; without this flag, stub mode is forced for the run",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Override LLM: --llm / --no-llm; omit to use DISCOVERY_LLM_ENABLED",
     )
     parser.add_argument(
         "--dry-run",
@@ -36,35 +48,35 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    saved_key = os.environ.get("OPENAI_API_KEY")
-    try:
-        if not args.llm:
-            os.environ.pop("OPENAI_API_KEY", None)
+    base_cfg = load_config_from_env()
+    cfg = merge_cli_overrides(
+        base_cfg,
+        llm=args.llm,
+        source=args.source,
+        limit=args.limit,
+    )
 
-        hits = search_candidates(args.query, args.limit)
-        classified = classify_candidates(hits)
-        normalized = normalize_candidates(classified)
+    bounded_limit = max(0, min(cfg.default_limit, 20))
+    hits = search_candidates(args.query, bounded_limit)
+    classified = classify_candidates(hits, llm_enabled=cfg.llm_enabled)
+    cls_mode = "llm" if (cfg.llm_enabled and os.environ.get("OPENAI_API_KEY")) else "stub"
+    normalized = normalize_candidates(classified, classification_mode=cls_mode)
 
-        if args.dry_run:
-            saved_ids: list[int] = []
-        else:
-            saved_ids = ingest_candidates(normalized)
+    if args.dry_run:
+        saved_ids: list[int] = []
+    else:
+        saved_ids = ingest_candidates(normalized)
 
-        pain_count = sum(1 for _, c in classified if c.is_pain)
+    pain_count = sum(1 for _, c in classified if c.is_pain)
 
-        print(f"source={args.source!r}")
-        print(f"found(raw)={len(hits)}")
-        print(f"passed_classification(pain)={pain_count}")
-        print(f"normalized={len(normalized)}")
-        if args.dry_run:
-            print("saved=0 (dry-run)")
-        else:
-            print(f"saved={len(saved_ids)}")
-    finally:
-        if saved_key is not None:
-            os.environ["OPENAI_API_KEY"] = saved_key
-        else:
-            os.environ.pop("OPENAI_API_KEY", None)
+    print(f"llm_enabled={cfg.llm_enabled} source={cfg.source!r} limit={cfg.default_limit}")
+    print(f"found(raw)={len(hits)}")
+    print(f"passed_classification(pain)={pain_count}")
+    print(f"normalized={len(normalized)}")
+    if args.dry_run:
+        print("saved=0 (dry-run)")
+    else:
+        print(f"saved={len(saved_ids)}")
 
 
 if __name__ == "__main__":

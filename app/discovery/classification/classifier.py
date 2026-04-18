@@ -88,11 +88,14 @@ def _classify_keyword_stub(text: str) -> ClassificationResult:
     )
 
 
-def classify_text(text: str) -> ClassificationResult:
+def classify_text(text: str, *, llm_enabled: bool = False) -> ClassificationResult:
     """
     Classify a single text for pain signal (binary + confidence + short reason).
 
     Does not generate user-facing prose beyond the structured fields returned.
+
+    ``llm_enabled`` is the explicit execution switch (DEC-008); when False, stub path
+    is always used regardless of ``OPENAI_API_KEY`` presence.
     """
     stripped = (text or "").strip()
     if not stripped:
@@ -102,6 +105,6 @@ def classify_text(text: str) -> ClassificationResult:
             reason="empty text",
         )
 
-    if os.environ.get("OPENAI_API_KEY"):
+    if llm_enabled and os.environ.get("OPENAI_API_KEY"):
         return _classify_openai(stripped)
     return _classify_keyword_stub(stripped)

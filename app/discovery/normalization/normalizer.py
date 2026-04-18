@@ -28,15 +28,18 @@ def _detected_theme(reason: str) -> str | None:
 def normalize_hit(
     hit: SearchHit,
     classification: ClassificationResult,
+    *,
+    classification_mode: str | None = None,
 ) -> NormalizedCandidate:
     """
     Map search hit + classification into a normalized discovery record.
 
     Caller is responsible for filtering to pain-positive rows when needed.
     """
+    mode_label = classification_mode if classification_mode is not None else _classification_mode()
     meta: dict[str, str] = {
         "classifier_reason": (classification.reason or "")[:500],
-        "classification_mode": _classification_mode(),
+        "classification_mode": mode_label,
     }
     theme = _detected_theme(classification.reason) if classification.is_pain else None
     score = float(classification.confidence) if classification.is_pain else None
