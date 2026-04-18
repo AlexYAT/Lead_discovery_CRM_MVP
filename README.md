@@ -60,6 +60,22 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 База по умолчанию создаётся при старте приложения (каталог `data/`).
 
+## Environment Configuration
+
+Шаблон переменных для **discovery CLI** (`python -m app.discovery.run`, см. `RUN.md`): скопируйте **`.env.example`** в **`.env`** в корне репозитория и при необходимости измените значения. Файл **`.env`** с секретами **не коммитьте**.
+
+Чтение окружения для discovery выполняется **только** в **`app/discovery/config.py`** (`load_config_from_env`); на baseline перечисленные переменные **все optional** — без ключей и без части `DISCOVERY_*` pipeline остаётся рабочим (stub / mock search / graceful fallback).
+
+| Переменная | Default (если не задана) | Назначение |
+|------------|--------------------------|------------|
+| `OPENAI_API_KEY` | *(пусто → без live LLM)* | Нужен для live **LLM** path классификации вместе с `DISCOVERY_LLM_ENABLED` / `--llm` |
+| `BRAVE_API_KEY` | *(пусто)* | Зарезервирован под будущий **Brave** HTTP provider; сейчас поиск mock |
+| `DISCOVERY_LLM_ENABLED` | `false` | Базовый флаг LLM до CLI (`--llm` / `--no-llm` перекрывает при запуске) |
+| `DISCOVERY_SOURCE` | `vk` | Execution-level метка источника (лог / orchestration) |
+| `DISCOVERY_DEFAULT_LIMIT` | `10` | Лимит сырых hit’ов до учёта CLI `--limit` и внутреннего cap |
+
+Секреты **не** передаются через аргументы CLI и **не** должны попадать в логи приложения.
+
 ## Структура проекта
 
 ```
@@ -75,6 +91,7 @@ data/                  # SQLite DB file (gitignored — не коммитить 
 docs/                  # DocOps: ideas, architecture, decisions, operations, IMP/VAL/AUD
 requirements.txt
 RUN.md
+.env.example          # шаблон env для discovery (без секретов)
 ```
 
 ## Roadmap
