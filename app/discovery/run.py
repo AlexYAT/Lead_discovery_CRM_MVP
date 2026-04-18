@@ -30,6 +30,12 @@ from app.discovery.observability import (
     observe_after_qualification,
     observe_after_search,
 )
+from app.discovery.observability.debug_cli import (
+    parse_diff_stages_arg,
+    read_debug_stages,
+    render_diff_view_lines,
+    render_stage_view_lines,
+)
 from app.discovery.qualification import qualify_candidates
 from app.discovery.search import search_candidates
 
@@ -65,11 +71,36 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="In-memory per-run stage snapshots for debug (no DB; see DOA-IMP-037)",
     )
+    dbg = parser.add_mutually_exclusive_group()
+    dbg.add_argument(
+        "--discovery-debug-stage",
+        choices=["search", "classification", "qualification", "normalization"],
+        default=None,
+        metavar="STAGE",
+        help="Print one observability stage to stderr (requires --discovery-observability; DOA-IMP-038)",
+    )
+    dbg.add_argument(
+        "--discovery-debug-diff",
+        type=parse_diff_stages_arg,
+        default=None,
+        metavar="A,B",
+        help="Diff two stages as identity sets (stderr; requires --discovery-observability)",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    if (args.discovery_debug_stage is not None or args.discovery_debug_diff is not None) and (
+        not args.discovery_observability
+    ):
+        print(
+            "discovery_debug: error: --discovery-debug-stage / --discovery-debug-diff "
+            "require --discovery-observability",
+            file=sys.stderr,
+            flush=True,
+        )
+        sys.exit(2)
     base_cfg = load_config_from_env()
     cfg = merge_cli_overrides(
         base_cfg,
@@ -122,7 +153,17 @@ def main() -> None:
         print(
             f"discovery_observability: stages={len(collector.export_stages())}",
             file=sys.stderr,
+            flush=True,
         )
+        if args.discovery_debug_stage is not None:
+            stages = read_debug_stages(collector)
+            for line in render_stage_view_lines(stages, args.discovery_debug_stage):
+                print(line, file=sys.stderr, flush=True)
+        elif args.discovery_debug_diff is not None:
+            a, b = args.discovery_debug_diff
+            stages = read_debug_stages(collector)
+            for line in render_diff_view_lines(stages, a, b):
+                print(line, file=sys.stderr, flush=True)
 
     has_openai_key = bool(cfg.openai_api_key)
     has_brave_key = bool(cfg.brave_api_key)
