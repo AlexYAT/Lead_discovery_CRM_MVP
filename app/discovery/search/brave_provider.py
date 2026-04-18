@@ -9,6 +9,9 @@ class BraveSearchProvider:
     Replace ``search`` body with HTTP calls to Brave when credentials are available.
     """
 
+    def __init__(self, brave_api_key: str | None = None) -> None:
+        self._brave_api_key = brave_api_key  # reserved for future Brave HTTP client
+
     def search(self, query: str, limit: int) -> list[SearchHit]:
         trimmed = (query or "").strip()
         q = trimmed or "(empty query)"

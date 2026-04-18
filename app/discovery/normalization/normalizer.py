@@ -1,12 +1,6 @@
-import os
-
 from app.discovery.classification.models import ClassificationResult
 from app.discovery.normalization.models import NormalizedCandidate
 from app.discovery.search.models import SearchHit
-
-
-def _classification_mode() -> str:
-    return "llm" if os.environ.get("OPENAI_API_KEY") else "stub"
 
 
 def _detected_theme(reason: str) -> str | None:
@@ -36,7 +30,7 @@ def normalize_hit(
 
     Caller is responsible for filtering to pain-positive rows when needed.
     """
-    mode_label = classification_mode if classification_mode is not None else _classification_mode()
+    mode_label = classification_mode if classification_mode is not None else "stub"
     meta: dict[str, str] = {
         "classifier_reason": (classification.reason or "")[:500],
         "classification_mode": mode_label,

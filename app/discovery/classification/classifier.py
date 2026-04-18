@@ -32,7 +32,7 @@ def _parse_json_object(content: str) -> ClassificationResult:
     return ClassificationResult(is_pain=is_pain, confidence=confidence, reason=reason)
 
 
-def _classify_openai(text: str) -> ClassificationResult:
+def _classify_openai(text: str, *, api_key: str) -> ClassificationResult:
     try:
         from openai import OpenAI
     except ImportError as error:
@@ -42,27 +42,31 @@ def _classify_openai(text: str) -> ClassificationResult:
             reason=f"openai package not installed: {error}",
         )
 
-    client = OpenAI()
-    model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-    completion = client.chat.completions.create(
-        model=model,
-        temperature=0,
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": build_user_message(text)},
-        ],
-    )
-    raw = completion.choices[0].message.content or ""
-    raw = raw.strip()
     try:
-        return _parse_json_object(raw)
-    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
-        return ClassificationResult(
-            is_pain=False,
-            confidence=_CONFIDENCE_IF_UNPARSEABLE,
-            reason="invalid or non-json model output; conservative default",
+        client = OpenAI(api_key=api_key)
+        model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+        completion = client.chat.completions.create(
+            model=model,
+            temperature=0,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": build_user_message(text)},
+            ],
         )
+        raw = completion.choices[0].message.content or ""
+        raw = raw.strip()
+        try:
+            return _parse_json_object(raw)
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+            return ClassificationResult(
+                is_pain=False,
+                confidence=_CONFIDENCE_IF_UNPARSEABLE,
+                reason="invalid or non-json model output; conservative default",
+            )
+    except Exception:
+        # Graceful fallback (DEC-009): auth/network/model errors → stub path
+        return _classify_keyword_stub(text)
 
 
 _PAIN_HINTS = re.compile(
@@ -74,7 +78,7 @@ _PAIN_HINTS = re.compile(
 
 
 def _classify_keyword_stub(text: str) -> ClassificationResult:
-    """Deterministic offline stub when OPENAI_API_KEY is unset (MVP / dev)."""
+    """Deterministic offline stub when LLM path is off or unavailable (MVP / dev)."""
     if _PAIN_HINTS.search(text):
         return ClassificationResult(
             is_pain=True,
@@ -88,14 +92,20 @@ def _classify_keyword_stub(text: str) -> ClassificationResult:
     )
 
 
-def classify_text(text: str, *, llm_enabled: bool = False) -> ClassificationResult:
+def classify_text(
+    text: str,
+    *,
+    llm_enabled: bool = False,
+    openai_api_key: str | None = None,
+) -> ClassificationResult:
     """
     Classify a single text for pain signal (binary + confidence + short reason).
 
     Does not generate user-facing prose beyond the structured fields returned.
 
     ``llm_enabled`` is the explicit execution switch (DEC-008); when False, stub path
-    is always used regardless of ``OPENAI_API_KEY`` presence.
+    is always used. When True, LLM path is used only if ``openai_api_key`` is non-empty
+    (passed explicitly from config; DEC-009 / IMP-032).
     """
     stripped = (text or "").strip()
     if not stripped:
@@ -105,6 +115,6 @@ def classify_text(text: str, *, llm_enabled: bool = False) -> ClassificationResu
             reason="empty text",
         )
 
-    if llm_enabled and os.environ.get("OPENAI_API_KEY"):
-        return _classify_openai(stripped)
+    if llm_enabled and openai_api_key:
+        return _classify_openai(stripped, api_key=openai_api_key)
     return _classify_keyword_stub(stripped)

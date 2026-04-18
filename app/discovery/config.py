@@ -1,4 +1,4 @@
-"""Discovery pipeline configuration (DOA-OP-008 / IMP-031). Stdlib only."""
+"""Discovery pipeline configuration (DOA-OP-008 / IMP-031; API keys IMP-032). Stdlib only."""
 
 from __future__ import annotations
 
@@ -6,11 +6,20 @@ import os
 from dataclasses import dataclass
 
 
+def _normalize_secret(value: str | None) -> str | None:
+    if value is None:
+        return None
+    s = str(value).strip()
+    return s if s else None
+
+
 @dataclass(frozen=True)
 class DiscoveryConfig:
     llm_enabled: bool
     source: str
     default_limit: int
+    openai_api_key: str | None
+    brave_api_key: str | None
 
 
 def _parse_bool_env(value: str | None, default: bool) -> bool:
@@ -42,6 +51,8 @@ def load_config_from_env() -> DiscoveryConfig:
         llm_enabled=_parse_bool_env(os.getenv("DISCOVERY_LLM_ENABLED"), False),
         source=source,
         default_limit=_parse_int_env(os.getenv("DISCOVERY_DEFAULT_LIMIT"), 10),
+        openai_api_key=_normalize_secret(os.getenv("OPENAI_API_KEY")),
+        brave_api_key=_normalize_secret(os.getenv("BRAVE_API_KEY")),
     )
 
 
@@ -63,4 +74,6 @@ def merge_cli_overrides(
         llm_enabled=next_llm,
         source=next_source,
         default_limit=next_limit,
+        openai_api_key=base.openai_api_key,
+        brave_api_key=base.brave_api_key,
     )
